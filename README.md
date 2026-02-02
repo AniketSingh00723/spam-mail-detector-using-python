@@ -60,7 +60,7 @@ Predict whether a message is spam or not
 
 Clone the repository:
 
-git clone https://github.com/aniketsingh00723/spam-mail-detector-using-python.git
+git clone https://github.com/AniketSingh00723/spam-mail-detector-using-python.git
 
 
 Install required libraries:
