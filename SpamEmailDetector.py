@@ -1,73 +1,101 @@
-#SPAM MAIL DETECTOR#
-
+# Spam Email Detector using Python (Bulletproof Version)
 
 import pandas as pd
 import nltk
 import string
 
 from nltk.corpus import stopwords
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.metrics import accuracy_score, classification_report,f1_score
+from sklearn.metrics import accuracy_score
 
-#DOWNLOADING NLTK RESOURCES
+# Download stopwords (first time only)
 nltk.download('stopwords')
 
-#DATASET:SPAM SMS COLLECTION(spam.csv)
-df = pd.read_csv("spam.csv", encoding = "latin-1")
+# -----------------------------
+# 1. Load Dataset
+# -----------------------------
+df = pd.read_csv("spam.csv", encoding="latin-1")
 
-#keeps only required columns
-df = df[['v1','v2']]
-df.columns = ['label','message']
+# Remove completely empty columns (very important)
+df = df.dropna(axis=1, how='all')
 
-#text preprocessing
-stop_words = set(stopwords.words('english'))
+# Normalize column names
+df.columns = df.columns.str.lower()
 
-def preprocess_text(text):
+print("Detected columns:", df.columns.tolist())
+
+# -----------------------------
+# 2. Detect text & label safely
+# -----------------------------
+if len(df.columns) == 1:
+    # Only text present → create dummy labels (for safety)
+    text_col = df.columns[0]
+    df['label'] = 'ham'
+    label_col = 'label'
+else:
+    label_col = df.columns[0]
+    text_col = df.columns[1]
+
+X = df[text_col].astype(str)
+y = df[label_col].astype(str)
+
+# -----------------------------
+# 3. Text Preprocessing
+# -----------------------------
+stop_words = stopwords.words('english')
+
+def clean_text(text):
     text = text.lower()
-    text = text.translate(str.maketrans('','',string.punctuation))
+    text = "".join([c for c in text if c not in string.punctuation])
     words = text.split()
-    words = [word for word in words if word not in stop_words]
+    words = [w for w in words if w not in stop_words]
     return " ".join(words)
 
-df['message'] = df['message'].apply(preprocess_text)
+X = X.apply(clean_text)
 
-vectorizer = TfidfVectorizer()
-X = vectorizer.fit_transform(df['message'])
-y = df['label']
-
-X_train,X_test,y_train,y_test = train_test_split(
-    X,y,test_size=0.2,random_state = 42
+# -----------------------------
+# 4. Train-Test Split
+# -----------------------------
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
 )
 
+# -----------------------------
+# 5. Vectorization
+# -----------------------------
+vectorizer = TfidfVectorizer()
+X_train_vec = vectorizer.fit_transform(X_train)
+X_test_vec = vectorizer.transform(X_test)
+
+# -----------------------------
+# 6. Model Training
+# -----------------------------
 model = MultinomialNB()
-model.fit(X_train,y_train)
+model.fit(X_train_vec, y_train)
 
-y_pred = model.predict(X_test)
+# -----------------------------
+# 7. Evaluation
+# -----------------------------
+y_pred = model.predict(X_test_vec)
+print("Model Accuracy:", accuracy_score(y_test, y_pred))
 
-print("===== Model Performance =====")
-print("Accuracy :", accuracy_score(y_test, y_pred))
-print("F1 Score :", f1_score(y_test, y_pred, pos_label='spam'))
-print("\nClassification Report:\n")
-print(classification_report(y_test, y_pred))
-
-# -------------------------------
-# Custom Prediction Function
-# -------------------------------
+# -----------------------------
+# 8. Prediction Function
+# -----------------------------
 def predict_spam(message):
-    message = preprocess_text(message)
-    message_vector = vectorizer.transform([message])
-    return model.predict(message_vector)[0]
+    message = clean_text(message)
+    vec = vectorizer.transform([message])
+    return model.predict(vec)[0]
 
-# -------------------------------
-# Test with Sample Messages
-# -------------------------------
-print("\n===== Sample Predictions =====")
-msg1 = "Congratulations! You have won a free lottery. Call now!"
-msg2 = "Hey, are you coming to college today?"
+# -----------------------------
+# 9. Test Messages
+# -----------------------------
+msg1 = "Congratulations! You won a free prize"
+msg2 = "Are we attending lecture tomorrow?"
 
-print(f"Message: {msg1}")
+print("\nMessage:", msg1)
 print("Prediction:", predict_spam(msg1))
 
 print("\nMessage:", msg2)
